@@ -1,11 +1,20 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 
 from src.config.runtime import connect, queue
 from src.constants.domain import Role
 from src.controllers import records
 from src.controllers.access import allow, current_user, login
 from src.models.ledger import list_lots
-from src.schemas.inputs import DecisionInput, Login, LotInput, RunInput, SampleInput
+from src.schemas.inputs import (
+    CorrectionInput,
+    DecisionInput,
+    Login,
+    LotInput,
+    RulingInput,
+    RunInput,
+    SampleInput,
+)
+from src.services.corrections import adjudicate, file_correction
 from src.services.inspections import enqueue, publish
 from src.services.ledger import add_lot, add_sample
 
@@ -52,6 +61,16 @@ def lot_workspace(lot_id: int, user=authenticated):
 @router.post("/lots/{lot_id}/samples", status_code=201)
 def create_sample(lot_id: int, payload: SampleInput, user=analyst):
     return add_sample(lot_id, payload, user["id"])
+
+
+@router.post("/lots/{lot_id}/corrections", status_code=201)
+def create_correction(lot_id: int, payload: CorrectionInput, response: Response, user=analyst):
+    return file_correction(lot_id, payload, user["id"], response)
+
+
+@router.post("/corrections/{correction_id}/adjudicate")
+def adjudicate_correction(correction_id: int, payload: RulingInput, user=reviewer):
+    return adjudicate(correction_id, payload, user["id"])
 
 
 @router.get("/lots/{lot_id}/audit")

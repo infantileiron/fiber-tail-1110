@@ -189,6 +189,13 @@ textarea { resize: vertical; }
 .metric-details summary { cursor: pointer; color: var(--rust); }
 .metric-details th, .metric-details td { padding: .35rem; }
 .cut-note { color: var(--rust); }
+.button.mini { padding: .38rem .8rem; font-size: .8rem; }
+.ruling-form { display: flex; gap: .45rem; }
+.diff-block { margin: 0 0 1.2rem; }
+.diff-block .table-scroll + .table-scroll, .diff-block .table-scroll + .quiet { border-top: 1px solid var(--hairline); }
+.diff-total td { background: var(--fold); font-weight: 700; }
+#correction-table td .badge + .badge { margin-left: .35rem; }
+.report-title .eyebrow .badge { margin-left: .5rem; vertical-align: .08em; }
 .decision-panel > form { width: min(100%, 430px); }
 .decision-panel h2 { margin: .3rem 0; }
 .audit-trail li { display: grid; grid-template-columns: auto 1fr; padding: .55rem .95rem; gap: 0 .7rem; font-size: .81rem; border-bottom: 1px solid var(--hairline); }

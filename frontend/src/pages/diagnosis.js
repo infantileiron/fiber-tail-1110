@@ -21,6 +21,7 @@ export function diagnosisPage() {
         ${history('diagnosis', work, report?.id)}</section></div>
         ${report ? `<section class="run-slip" data-status="${report.status}" id="run-slip"><div><p class="eyebrow">${version(report.version)} · 后台计算</p>
         <strong>${({queued: '已排队，正在等待计算', succeeded: '计算完成，验收单已生成', failed: '诊断未完成'})[report.status]}</strong>
-        <p>${esc(report.error ?? (report.status === 'queued' ? '保持页面打开即可查看完成状态。' : '验收单包含分布、截尾明细和复核依据。'))}</p></div>
+        <p>${esc(report.error ?? (report.status === 'queued' ? '保持页面打开即可查看完成状态。' : '验收单包含分布、截尾明细和复核依据。'))}</p>
+        ${report.publish_state === 'draft' ? '<p>存在待裁定的称重更正，本版仅作草稿；裁定采用后按原参数自动重算，算完的最新版才能发布。</p>' : ''}</div>
         ${report.result ? `<a class="button secondary" href="${route('decisions', work.lot.id, report.id)}">查看验收单 ↗</a>` : ''}</section>` : ''}`;
 }

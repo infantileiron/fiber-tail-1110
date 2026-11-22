@@ -77,6 +77,40 @@ function bindActions() {
         notify(`已保存干样 ${values.code}`);
         await load({keepPosition: true});
     });
+    const correctionForm = document.querySelector('#correction-form');
+    if (correctionForm && state.workspace) {
+        const fillCurrent = () => {
+            const sample = state.workspace.samples.find(item => item.code === correctionForm.elements.sample_code.value);
+            if (sample) {
+                correctionForm.elements.location.value = sample.location;
+                correctionForm.elements.dry_g.value = sample.dry_g;
+                correctionForm.elements.impurity_g.value = sample.impurity_g;
+            }
+        };
+        correctionForm.elements.sample_code.addEventListener('change', fillCurrent);
+        fillCurrent();
+    }
+    submitForm('#correction-form', async values => {
+        const saved = await post(`/lots/${lot}/corrections`, {...values, dry_g: Number(values.dry_g), impurity_g: Number(values.impurity_g)});
+        notify(saved.duplicate ? `更正单 ${saved.ticket} 此前已入账，未重复登记` : `已入账更正单 ${saved.ticket}，待复核岗裁定`);
+        await load({keepPosition: true});
+    });
+    for (const form of document.querySelectorAll('.ruling-form')) {
+        form.addEventListener('submit', async event => {
+            event.preventDefault();
+            const button = event.submitter;
+            if (!button?.value) return;
+            button.disabled = true;
+            try {
+                const result = await post(`/corrections/${form.dataset.correction}/adjudicate`, {verdict: button.value});
+                notify(result.recompute_version ? `已采用更正，按原参数重算 ${version(result.recompute_version)}` : '已裁定该更正单');
+                await load({keepPosition: true});
+            } catch (error) {
+                notify(error.message, true);
+                button.disabled = false;
+            }
+        });
+    }
     submitForm('#run-form', async values => {
         const created = await post(`/lots/${lot}/inspections`, values);
         notify(`已提交 ${version(created.version)} 诊断`);

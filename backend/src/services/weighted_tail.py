@@ -12,13 +12,81 @@ def percent(value):
     return float(value * 100)
 
 
+def _tail_takes(samples, tail_pct):
+    """Walk samples from the highest impurity rate down until the tail share is filled.
+
+    Returns ordered (ratio, code, dry_g, used_g) takes and the exact tail grams.
+    Tied rates are broken by sample code, so each code appears at most once and a
+    boundary sample contributes only its truncated grams.
+    """
+    total_g = sum(sample["dry_g"] for sample in samples)
+    tail_g = total_g * Fraction(tail_pct) / 100
+    remaining_g = tail_g
+    takes = []
+    pairs = sorted(
+        (Fraction(sample["impurity_g"], sample["dry_g"]), sample["code"], sample["dry_g"])
+        for sample in samples
+    )
+    for ratio, code, dry_g in sorted(pairs, key=lambda item: (-item[0], item[1])):
+        used_g = min(remaining_g, dry_g)
+        takes.append((ratio, code, dry_g, used_g))
+        remaining_g -= used_g
+        if remaining_g == 0:
+            break
+    return takes, tail_g
+
+
+def tail_grams(samples, tail_pct):
+    """Exact grams each sample contributes to the tail share, keyed by sample code."""
+    takes, tail_g = _tail_takes(samples, tail_pct)
+    return {code: used_g for _, code, _, used_g in takes}, tail_g
+
+
+def sample_changes(before, after):
+    """Snapshot rows that were added, removed or reweighed between two snapshots."""
+    before_by_code = {row["code"]: row for row in before}
+    after_by_code = {row["code"]: row for row in after}
+    changes = []
+    for code in sorted(set(before_by_code) | set(after_by_code)):
+        previous, current = before_by_code.get(code), after_by_code.get(code)
+        if previous != current:
+            changes.append({"code": code, "before": previous, "after": current})
+    return changes
+
+
+def tail_diff(before_samples, before_tail_pct, after_samples, after_tail_pct):
+    """Per-sample tail gram difference between two versions.
+
+    Deltas are exact rationals: tied rates align by sample code and boundary
+    samples keep their truncated grams, so the per-sample deltas always sum to
+    the change of the two tail totals.
+    """
+    before_map, before_total = tail_grams(before_samples, before_tail_pct)
+    after_map, after_total = tail_grams(after_samples, after_tail_pct)
+    entries = []
+    for code in sorted(set(before_map) | set(after_map)):
+        before_g = before_map.get(code, Fraction(0))
+        after_g = after_map.get(code, Fraction(0))
+        if before_g != after_g:
+            entries.append({
+                "code": code,
+                "before_g": float(before_g),
+                "after_g": float(after_g),
+                "delta_g": float(after_g - before_g),
+            })
+    return {
+        "entries": entries,
+        "before_total_g": float(before_total),
+        "after_total_g": float(after_total),
+    }
+
+
 def analyze(samples, parameters):
     """Compute the empirical distribution with unit dry grams as the weights."""
     if len(samples) < MIN_SAMPLES:
         raise InsufficientSamples(f"有效干样至少需要 {MIN_SAMPLES} 份，本次仅锁定 {len(samples)} 份。")
 
     threshold = Fraction(parameters["threshold_pct"]) / 100
-    tail_share = Fraction(parameters["tail_pct"]) / 100
     exceed_cap = Fraction(parameters["exceed_cap_pct"]) / 100
     tail_cap = Fraction(parameters["tail_cap_pct"]) / 100
     total_g = sum(sample["dry_g"] for sample in samples)
@@ -40,20 +108,15 @@ def analyze(samples, parameters):
             "sample_codes": [code for _, code, _ in entries],
         })
 
-    tail_g = total_g * tail_share
-    remaining_g = tail_g
+    takes, tail_g = _tail_takes(samples, parameters["tail_pct"])
     integrated = Fraction(0)
     contributions = []
-    for ratio, code, dry_g in sorted(pairs, key=lambda item: (-item[0], item[1])):
-        used_g = min(remaining_g, dry_g)
+    for ratio, code, dry_g, used_g in takes:
         integrated += used_g * ratio
-        remaining_g -= used_g
         contributions.append({
             "code": code, "concentration_pct": percent(ratio), "dry_g": dry_g,
             "used_g": float(used_g), "impurity_equivalent_g": float(used_g * ratio),
         })
-        if remaining_g == 0:
-            break
 
     exceed_share = Fraction(exceed_g, total_g)
     tail_mean = integrated / tail_g

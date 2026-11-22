@@ -19,6 +19,12 @@ class Outcome(StrEnum):
     REJECT = "reject"
 
 
+class CorrectionStatus(StrEnum):
+    PENDING = "pending"
+    ADOPTED = "adopted"
+    REJECTED = "rejected"
+
+
 MIN_SAMPLES = 3
 MAX_SAMPLES = 250
 ALGORITHM_VERSION = "weighted-tail-v1"

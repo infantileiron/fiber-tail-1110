@@ -1,6 +1,6 @@
 from datetime import date
 from decimal import Decimal
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, StringConstraints, model_validator
 
@@ -48,6 +48,24 @@ class RunInput(Input):
     tail_pct: Annotated[Percent, Field(gt=0)] = Decimal("15")
     exceed_cap_pct: Percent = Decimal("20")
     tail_cap_pct: Percent = Decimal("8")
+
+
+class CorrectionInput(Input):
+    ticket: Code
+    sample_code: Code
+    location: ShortText
+    dry_g: Annotated[StrictInt, Field(gt=0, le=100_000)]
+    impurity_g: Annotated[StrictInt, Field(ge=0, le=100_000)]
+
+    @model_validator(mode="after")
+    def validate_weights(self):
+        if self.impurity_g > self.dry_g:
+            raise ValueError("杂质重量不得超过干样重量")
+        return self
+
+
+class RulingInput(Input):
+    verdict: Literal["adopted", "rejected"]
 
 
 class DecisionInput(Input):

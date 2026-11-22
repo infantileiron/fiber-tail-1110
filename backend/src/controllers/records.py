@@ -6,8 +6,10 @@ from fastapi.responses import Response
 
 from src.config.runtime import connect
 from src.constants.domain import Role, RunStatus
+from src.models.corrections import list_corrections
 from src.models.inspections import get_inspection, list_inspections
 from src.models.ledger import get_lot, list_samples
+from src.services.inspections import attach_publish_state, publish_context, resolve_publish_state
 
 
 def lot_workspace(lot_id, user):
@@ -15,7 +17,13 @@ def lot_workspace(lot_id, user):
         lot = get_lot(db, lot_id)
         readings = list_samples(db, lot_id)
         runs = list_inspections(db, lot_id, user["role"] == Role.OBSERVER)
-    return {"lot": lot, "samples": readings, "inspections": runs}
+        if user["role"] == Role.OBSERVER:
+            return {"lot": lot, "samples": readings, "inspections": runs}
+        attach_publish_state(db, lot_id, runs)
+        return {
+            "lot": lot, "samples": readings, "inspections": runs,
+            "corrections": list_corrections(db, lot_id),
+        }
 
 
 def audit_trail(lot_id):
@@ -42,6 +50,8 @@ def inspection_detail(run_id, user):
                 """, (report["lot_id"], result["comparison"]["previous_version"])).fetchone()
                 if not visible:
                     result["comparison"] = None
+        else:
+            report["publish_state"] = resolve_publish_state(report, publish_context(db, report["lot_id"]))
         return report
 
 
